@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="FINORA × DAPIN — Modern Financial Management & Digital Lending Platform. Satu ekosistem keuangan dan simpan-pinjam.">
+  <title>FINORA × DAPIN — One Fintech Ecosystem</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235b7cfa'/%3E%3Cstop offset='1' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M16 25s7-4 7-9.5V9l-7-2.5L9 9v6.5C9 21 16 25 16 25z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M12.5 15h7M16 11.5v7' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Core -->
+  <script src="js/data.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/logic.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seed.js"></script>
+  <!-- App -->
+  <script src="js/app-core.js"></script>
+  <script src="js/views-finance.js"></script>
+  <script src="js/views-dapin.js"></script>
+  <script src="js/views-tools.js"></script>
+  <script src="js/views-system.js"></script>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      function bindPage(key, param) {
+        var fn = (window.Pages || {})['_bind_' + key];
+        if (fn) fn(param);
+      }
+      window.bindPage = bindPage;
+      window.APP._bindPage = bindPage;
+      window.APP.boot();
+    });
+  </script>
+</body>
+</html>
