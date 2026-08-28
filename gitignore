@@ -1,0 +1,62 @@
+# ============================================================
+# FINORA × DAPIN — .gitignore
+# Static SPA (HTML/CSS/JS, no build step)
+# ============================================================
+
+# --- Dependencies ---
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# --- Environment & Secrets ---
+.env
+.env.*
+!.env.example
+*.local
+config.local.js
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Build artifacts (jika nanti pakai bundler) ---
+dist/
+build/
+.cache/
+.parcel-cache/
+.vite/
+
+# --- Temp files ---
+*.tmp
+*.bak
+*.orig
+
+# --- Supabase (jika dipakai nanti) ---
+supabase/.branches
+supabase/.temp
+
+# --- Test coverage ---
+coverage/
+.nyc_output/
+
+# --- Misc ---
+*.zip
+*.tar.gz
