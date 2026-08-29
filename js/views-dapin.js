@@ -719,7 +719,7 @@
   Pages._bind_memberApply = function () {
     var form = document.getElementById('applyForm');
     if (!form) return;
-    var FIXED_RATE = 35;      /* internal: 35% per bulan flat — TIDAK DITAMPILKAN ke anggota */
+    var FIXED_RATE = 20;      /* internal: 20% per bulan flat — TIDAK DITAMPILKAN ke anggota */
     var FIXED_METHOD = 'flat';
     var ADMIN_FEE_PCT = 10;   /* potongan admin 10% */
 
