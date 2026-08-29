@@ -66,6 +66,33 @@ small { font-size: 12px; }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); border-color: transparent; color: #fff; box-shadow: 0 6px 18px -6px rgba(34,197,94,.5); }
 .btn-success:hover { filter: brightness(1.08); }
+
+/* ===== KWITANSI ===== */
+.kwitansi { padding: 8px 4px; }
+.kwitansi-head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--border2); padding-bottom:16px; margin-bottom:16px; }
+.kwitansi-brand { display:flex; align-items:center; gap:10px; }
+.kwitansi-brand .ic { width:32px; height:32px; color:var(--primary); }
+.kwitansi-brand b { font-size:18px; }
+.kwitansi-brand em { color:var(--primary); font-style:normal; }
+.kwitansi-brand small { display:block; color:var(--text-muted); font-size:12px; }
+.kwitansi-no { text-align:right; }
+.kwitansi-no small { display:block; color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+.kwitansi-no b { font-size:16px; color:var(--primary); }
+.kwitansi-meta { display:grid; grid-template-columns:1fr 1fr; gap:12px 24px; margin-bottom:20px; }
+.kwitansi-meta > div { display:flex; flex-direction:column; gap:2px; }
+.kwitansi-meta small { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; }
+.kwitansi-meta span { font-size:14px; font-weight:600; }
+.kwitansi-photo img { margin-top:4px; }
+.kwitansi-table { width:100%; border-collapse:collapse; margin-bottom:20px; }
+.kwitansi-table td { padding:12px 16px; border-bottom:1px solid var(--border2); font-size:14px; }
+.kwitansi-table td.kw-val { text-align:right; font-weight:600; }
+.kwitansi-table tr.kw-highlight td { background:var(--bg-2); }
+.kwitansi-table tr.kw-total td { border-bottom:none; border-top:2px solid var(--primary); font-size:16px; font-weight:700; background:var(--bg-2); }
+.kw-red { color:var(--danger, #ef4444); }
+.kwitansi-foot { border-top:1px solid var(--border2); padding-top:16px; }
+.kwitansi-foot .muted { font-size:12px; margin-bottom:12px; }
+.kwitansi-actions { display:flex; gap:8px; flex-wrap:wrap; }
+
 .btn-ghost { background: transparent; border-color: var(--border2); }
 .btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c); border-color: transparent; color: #fff; }
 .btn-danger-ghost { background: transparent; border-color: rgba(239,68,68,.5); color: #ff8a8a; }

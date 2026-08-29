@@ -607,21 +607,20 @@
       ], items);
   };
 
-  /* Ajukan Pinjaman */
+  /* Ajukan Pinjaman — form: jumlah + foto wajah + tenor → kwitansi otomatis */
   Pages.memberApply = function () {
     var db = root.APP.getDB();
     var mid = root.APP.memberDapinId();
     var active = db.dapin_loans.filter(function (l) { return l.member_id === mid && (l.status === 'Active' || l.status === 'Overdue'); });
     if (active.length >= 3) return root.APP.pageHead('Ajukan Pinjaman', '') +
       '<div class="state"><div class="state-ic">' + icon('alert') + '</div><h4>Batas pinjaman aktif tercapai</h4><p class="muted">Anda sudah memiliki 3 pinjaman aktif. Selesaikan salah satu sebelum mengajukan lagi.</p></div>';
-    return root.APP.pageHead('Ajukan Pinjaman', 'Isi form untuk mengajukan pinjaman baru') +
+    return root.APP.pageHead('Ajukan Pinjaman', 'Isi data untuk mengajukan pinjaman') +
       '<div class="card"><div class="card-t"><h3>Form Pengajuan</h3></div><div class="card-body">' +
       '<form id="applyForm">' +
         UIK.field('Jumlah Pinjaman (Rp)', UIK.input('principal', '', 'Minimal Rp 100.000', 'number')) +
-        UIK.field('Tenor (bulan)', UIK.input('tenor', '', '1–120 bulan', 'number')) +
-        '<div class="field"><label>Bunga &amp; Metode</label><div class="muted" style="padding:10px 12px;background:var(--bg-2);border-radius:8px;border:1px solid var(--border2)"><b>70% per bulan — Flat</b><br><small>Margin Rp 70.000 per Rp 100.000/bulan. Ditetapkan otomatis, anggota tidak dapat mengubah.</small></div></div>' +
-        '<div id="applyPreview" class="muted" style="margin:12px 0;padding:12px;background:var(--bg-2);border-radius:8px">Isi jumlah dan tenor untuk melihat preview cicilan.</div>' +
-        '<button type="submit" class="btn btn-success">' + icon('plus') + ' Ajukan Sekarang</button>' +
+        '<div class="field"><label>Foto Wajah</label><input type="file" name="photo" accept="image/*" capture="user" style="padding:8px;background:var(--bg-2);border:1px solid var(--border2);border-radius:8px;color:var(--text-muted);width:100%"><small class="muted" style="display:block;margin-top:4px">Ambil foto wajah untuk verifikasi pengajuan.</small></div>' +
+        UIK.field('Tenor (bulan)', UIK.input('tenor', '', 'Berapa bulan', 'number')) +
+        '<button type="submit" class="btn btn-success" style="margin-top:8px">' + icon('plus') + ' Ajukan Pinjaman</button>' +
       '</form></div></div>';
   };
 
@@ -669,39 +668,87 @@
   Pages._bind_memberApply = function () {
     var form = document.getElementById('applyForm');
     if (!form) return;
-    var preview = document.getElementById('applyPreview');
-    var FIXED_RATE = 70;     /* bunga tetap 70% per bulan (flat) — margin Rp 70rb per Rp 100rb */
+    var FIXED_RATE = 70;      /* internal: 70% per bulan flat — TIDAK DITAMPILKAN ke anggota */
     var FIXED_METHOD = 'flat';
-    function updatePreview() {
-      var d = UIK.formdata(form);
-      var p = Number(d.principal), t = Number(d.tenor);
-      if (p > 0 && t > 0) {
-        var sched = LG.buildSchedule(FIXED_METHOD, p, FIXED_RATE, t, DB.today());
-        var tot = LG.loanTotals(sched);
-        preview.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-          '<div><b>Cicilan/bulan:</b><br>' + money(tot.installment) + '</div>' +
-          '<div><b>Total bunga:</b><br>' + money(tot.interestTotal) + '</div>' +
-          '<div><b>Total bayar:</b><br>' + money(tot.totalPayment) + '</div>' +
-          '<div><b>Jumlah cicilan:</b><br>' + t + 'x</div></div>';
-      } else {
-        preview.innerHTML = 'Isi jumlah dan tenor untuk melihat preview cicilan.';
-        preview.className = 'muted';
-      }
-    }
-    form.querySelectorAll('input,select').forEach(function (el) { el.addEventListener('input', updatePreview); el.addEventListener('change', updatePreview); });
+    var ADMIN_FEE_PCT = 10;   /* potongan admin 10% */
+
     form.onsubmit = function (e) {
       e.preventDefault();
       var d = UIK.formdata(form);
       var p = Number(d.principal), t = Number(d.tenor);
+      var photoInput = form.querySelector('input[name="photo"]');
+
+      /* validasi */
       if (!p || p < 100000) { UIK.toast('Minimal pinjaman Rp 100.000.', 'error'); return; }
       if (!t || t < 1) { UIK.toast('Tenor minimal 1 bulan.', 'error'); return; }
+      if (!photoInput || !photoInput.files || !photoInput.files[0]) { UIK.toast('Foto wajah wajib diunggah.', 'error'); return; }
+
+      /* hitung internal (tidak ditampilkan ke anggota) */
+      var sched = LG.buildSchedule(FIXED_METHOD, p, FIXED_RATE, t, DB.today());
+      var tot = LG.loanTotals(sched);
+      var adminFee = Math.round(p * ADMIN_FEE_PCT / 100);
+      var amountReceived = p - adminFee;
+      var monthlyPayment = Math.round(tot.installment);
+      var totalRepayment = Math.round(tot.totalPayment);
+
+      /* buat pinjaman di database */
       var db = root.APP.getDB();
-      var res = LG.createLoan(db, { member_id: root.APP.memberDapinId(), principal: p, method: FIXED_METHOD, rate: FIXED_RATE, tenor: t, startDate: DB.today() }, root.APP.getSession().userId);
+      var res = LG.createLoan(db, {
+        member_id: root.APP.memberDapinId(),
+        principal: p, method: FIXED_METHOD, rate: FIXED_RATE,
+        tenor: t, startDate: DB.today()
+      }, root.APP.getSession().userId);
+
       if (!res.ok) { UIK.toast(res.error, 'error'); return; }
-      root.APP.saveDB();
-      root.APP.afterMutate();
-      UIK.toast('Pinjaman ' + res.loan.loan_id + ' diajukan & disetujui! ✅ Bunga 70%/bln flat.', 'success');
-      location.hash = '#/member/loans';
+
+      /* simpan foto sebagai base64 di loan (demo) */
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        res.loan.photo = ev.target.result;
+        root.APP.saveDB();
+        root.APP.afterMutate();
+
+        /* tampilkan KWITANSI */
+        var member = db.dapin_members.find(function (m) { return m.id === root.APP.memberDapinId(); });
+        var loanNum = res.loan.loan_id;
+        var todayStr = fmt.date(DB.today());
+        var memberName = member ? member.name : '—';
+        var memberId = member ? member.member_id : '—';
+
+        var kwitansiHTML =
+          '<div class="kwitansi">' +
+            '<div class="kwitansi-head">' +
+              '<div class="kwitansi-brand">' + icon('dapin') + '<div><b>FINORA <em>×</em> DAPIN</b><small>Bukti Pengajuan Pinjaman</small></div></div>' +
+              '<div class="kwitansi-no"><small>No. Dokumen</small><b>' + esc(loanNum) + '</b></div>' +
+            '</div>' +
+            '<div class="kwitansi-meta">' +
+              '<div><small>Tanggal</small><span>' + esc(todayStr) + '</span></div>' +
+              '<div><small>Nama Anggota</small><span>' + esc(memberName) + '</span></div>' +
+              '<div><small>ID Anggota</small><span>' + esc(memberId) + '</span></div>' +
+              '<div class="kwitansi-photo"><small>Foto Wajah</small><img src="' + ev.target.result + '" style="width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--border2)"></div>' +
+            '</div>' +
+            '<table class="kwitansi-table">' +
+              '<tr><td>Jumlah Pinjaman</td><td class="kw-val">' + money(p) + '</td></tr>' +
+              '<tr><td>Potongan Admin (10%)</td><td class="kw-val kw-red">− ' + money(adminFee) + '</td></tr>' +
+              '<tr class="kw-highlight"><td>Jumlah Diterima</td><td class="kw-val">' + money(amountReceived) + '</td></tr>' +
+              '<tr><td>Tenor</td><td class="kw-val">' + t + ' bulan</td></tr>' +
+              '<tr class="kw-highlight"><td>Pembayaran per Bulan</td><td class="kw-val">' + money(monthlyPayment) + '</td></tr>' +
+              '<tr class="kw-highlight kw-total"><td>Total yang Harus Dikembalikan</td><td class="kw-val">' + money(totalRepayment) + '</td></tr>' +
+            '</table>' +
+            '<div class="kwitansi-foot">' +
+              '<p class="muted">Kwintansi ini sebagai bukti pengajuan pinjaman. Simpan baik-baik.</p>' +
+              '<div class="kwitansi-actions">' +
+                '<button class="btn btn-ghost" data-close>Tutup</button>' +
+                '<button class="btn btn-primary" id="kwPrint" onclick="window.print()">🖨️ Cetak</button>' +
+                '<a class="btn btn-success" href="#/member/loans">Lihat Pinjaman Saya</a>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+
+        UIK.openModal(kwitansiHTML, true);
+        UIK.toast('Pinjaman ' + loanNum + ' berhasil diajukan! ✅', 'success');
+      };
+      reader.readAsDataURL(photoInput.files[0]);
     };
   };
 })(typeof window !== 'undefined' ? window : globalThis);
