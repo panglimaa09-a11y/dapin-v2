@@ -619,7 +619,7 @@
       '<form id="applyForm">' +
         UIK.field('Jumlah Pinjaman (Rp)', UIK.input('principal', '', 'Minimal Rp 100.000', 'number')) +
         UIK.field('Tenor (bulan)', UIK.input('tenor', '', '1–120 bulan', 'number')) +
-        '<div class="field"><label>Bunga &amp; Metode</label><div class="muted" style="padding:10px 12px;background:var(--bg-2);border-radius:8px;border:1px solid var(--border2)"><b>8% per bulan — Flat</b><br><small>Ditetapkan otomatis oleh sistem. Anggota tidak dapat mengubah bunga.</small></div></div>' +
+        '<div class="field"><label>Bunga &amp; Metode</label><div class="muted" style="padding:10px 12px;background:var(--bg-2);border-radius:8px;border:1px solid var(--border2)"><b>70% per bulan — Flat</b><br><small>Margin Rp 70.000 per Rp 100.000/bulan. Ditetapkan otomatis, anggota tidak dapat mengubah.</small></div></div>' +
         '<div id="applyPreview" class="muted" style="margin:12px 0;padding:12px;background:var(--bg-2);border-radius:8px">Isi jumlah dan tenor untuk melihat preview cicilan.</div>' +
         '<button type="submit" class="btn btn-success">' + icon('plus') + ' Ajukan Sekarang</button>' +
       '</form></div></div>';
@@ -670,7 +670,7 @@
     var form = document.getElementById('applyForm');
     if (!form) return;
     var preview = document.getElementById('applyPreview');
-    var FIXED_RATE = 8;     /* bunga tetap 8% per bulan (flat) */
+    var FIXED_RATE = 70;     /* bunga tetap 70% per bulan (flat) — margin Rp 70rb per Rp 100rb */
     var FIXED_METHOD = 'flat';
     function updatePreview() {
       var d = UIK.formdata(form);
@@ -700,7 +700,7 @@
       if (!res.ok) { UIK.toast(res.error, 'error'); return; }
       root.APP.saveDB();
       root.APP.afterMutate();
-      UIK.toast('Pinjaman ' + res.loan.loan_id + ' diajukan & disetujui! ✅ Bunga 8%/bln flat.', 'success');
+      UIK.toast('Pinjaman ' + res.loan.loan_id + ' diajukan & disetujui! ✅ Bunga 70%/bln flat.', 'success');
       location.hash = '#/member/loans';
     };
   };
