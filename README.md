@@ -1,86 +1,81 @@
-# FINORA × DAPIN
+# FINORA × DAPIN — One Fintech Ecosystem
 
-**Modern Financial Management & Digital Lending Platform**
+**Modern Financial Management & Digital Lending Platform.**
 
-FINORA = pusat pengelolaan keuangan (transaksi, saldo, wallet, budget, analytics, reports).
-DAPIN = modul simpan-pinjam/pembiayaan di dalam FINORA (anggota, simpanan, pinjaman, angsuran).
+Satu aplikasi web mandiri (tanpa build step) yang menggabungkan **FINORA** (financial dashboard)
+dan **DAPIN** (modul simpan-pinjam / pembiayaan) sebagai satu ekosistem dengan satu navigasi,
+satu sumber data, dan satu design system.
 
-## ✨ Fitur Baru — Login Terpisah Panel Admin & Anggota
+## Menjalankan
 
-| Panel | Akses | Fungsi |
-|-------|-------|--------|
-| **🔧 Admin** | Full control | Dashboard, Keuangan, Wallet, Kelola Anggota, Simpanan, Pinjaman, Buku Besar, Kalkulator, Pengaturan |
-| **👤 Anggota** | Terbatas | Beranda, Pinjaman Saya, Bayar Angsuran, Ajukan Pinjaman, Simpanan Saya, Profil |
+Buka `index.html` langsung di browser, atau jalankan server statis:
 
-Anggota **tidak bisa** mengelola anggota lain, menghapus data, atau mengakses keuangan organisasi.
-Anggota **hanya bisa** melihat data sendiri, membayar angsuran, dan mengajukan pinjaman baru.
-
-## 🔑 Akun Demo
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | `admin@finora.com` | `admin123` |
-| Anggota (Budi) | `budi@finora.com` | `member123` |
-| Anggota (Siti) | `siti@finora.com` | `member123` |
-| Anggota (Agus) | `agus@finora.com` | `member123` |
-| Anggota (Dewi) | `dewi@finora.com` | `member123` |
-| Anggota (Maya) | `maya@finora.com` | `member123` |
-
-## 🚀 Cara Menjalankan
-
-### Opsi 1 — Buka langsung
-Ekstrak ZIP → buka `finora-dapin/index.html` di browser.
-
-### Opsi 2 — Server statis (rekomendasi)
 ```bash
-cd finora-dapin
 npx serve .
-# atau
-python3 -m http.server 8000
-```
-Buka `http://localhost:8000` atau `http://localhost:3000`.
-
-## 🧪 Pengujian
-```bash
-node test/self-test.js
-```
-Memverifikasi: seed data, login separation, loan schedule (anuitas/flat), payment cascade (pembayaran → saldo pinjaman → wallet → transaksi FINORA), role-based access, loan payoff.
-
-## 📁 Struktur File
-
-```
-finora-dapin/
-├── index.html              # Entry point SPA
-├── README.md
-├── .gitignore
-├── css/
-│   └── style.css           # Design system dark fintech
-├── js/
-│   ├── data.js             # Lapisan data (localStorage)
-│   ├── seed.js             # Data demo
-│   ├── auth.js             # Auth + role separation (admin/anggota)
-│   ├── logic.js            # Kalkulasi pinjaman + cascade pembayaran
-│   ├── ui.js               # Pustaka komponen UI
-│   ├── charts.js           # Grafik SVG (donut, bar, line)
-│   ├── app-core.js         # Shell, sidebar, router, role-based menu
-│   ├── views-finance.js    # Halaman FINORA (admin: dashboard, finance, wallet)
-│   ├── views-dapin.js      # Halaman DAPIN (admin: kelola; anggota: bayar & pinjam)
-│   ├── views-tools.js      # Kalkulator pinjaman
-│   └── views-system.js     # Pengaturan sistem
-└── test/
-    └── self-test.js        # Pengujian konsistensi data
+# lalu buka http://localhost:3000
 ```
 
-## 🏗️ Arsitektur
+Data tersimpan di **localStorage** browser (persisten antar sesi). Tombol *Reset Data Demo*
+ada di layar login & halaman Settings.
 
-- **SPA murni** — HTML/CSS/JS, no build step, no framework
-- **Data layer** — localStorage, siap ditukar ke Supabase
-- **Role-based routing** — menu dan akses berbeda untuk admin vs anggota
-- **Cascade pembayaran** — pembayaran angsuran otomatis mengurangi saldo pinjaman, menambah wallet, dan mencatat transaksi FINORA
-- **Kalkulasi pinjaman** — anuitas (rumus standar) dan flat
+### Akun demo
 
-## 📝 Catatan
+| Role            | Email              | Password  |
+|-----------------|--------------------|-----------|
+| SUPER ADMIN     | admin@finora.app   | admin123  |
+| DAPIN STAFF     | staff@finora.app   | staff123  |
+| USER            | user@finora.app    | user123   |
 
-- Data tersimpan di localStorage browser (per-browser, per-device)
-- Tombol **Reset Data Demo** di Settings (admin) untuk kembali ke data awal
-- Saat admin menambah anggota baru, akun login anggota otomatis dibuat (password default: `member123`)
+## Struktur
+
+```
+css/style.css           Design system (dark, glassmorphism, responsif)
+js/data.js              Lapisan data (adapter localStorage — ganti ke Supabase untuk produksi)
+js/charts.js            Grafik SVG ringan (line, bar, donut, hbar)
+js/logic.js             Mesin bisnis: kalkulasi pinjaman + cascade pembayaran (murni, atomik)
+js/ui.js                UI kit: ikon, modal, toast, badge, state loading/empty/error
+js/auth.js              Auth demo (verifikasi lokal — ganti ke Supabase Auth untuk produksi)
+js/seed.js              Seed data demo yang konsisten (semua lewat business logic)
+js/app-core.js          Boot, sidebar, router hash, pencarian global, notifikasi, shell
+js/views-finance.js     Dashboard, Transactions, Wallet, Budget, Analytics, Reports
+js/views-dapin.js       DAPIN: Overview, Members, Profile, Savings, Loans, Installments, Payments, Due Dates, Ledger, Reports
+js/views-tools.js       Kalkulator Keuangan, Pinjaman, Tabungan
+js/views-system.js      Notifikasi, Profile, Settings, Audit Logs
+test/self-test.js       Uji konsistensi data (Node)
+test/dom-test.js        Uji render seluruh halaman (Node + jsdom)
+```
+
+## Konsistensi data (inti)
+
+Satu pembayaran angsuran menjalankan **cascade atomik** dalam satu fungsi:
+
+```
+Payment → installment (status Paid/Partial) → remaining_balance pinjaman
+        → status pinjaman (Completed jika lunas) → saldo wallet FINORA
+        → transaksi FINORA (income) → ledger DAPIN (pokok + bunga terpisah)
+        → notifikasi → audit log
+```
+
+Metode bunga: **Flat** (per bulan) dan **Anuitas** (per tahun). Formula ditampilkan
+transparan di antarmuka.
+
+## Mode demo vs produksi
+
+- **Demo ini**: localStorage, auth verifikasi lokal, satu organisasi, tanpa server.
+- **Produksi (Supabase + Vercel)**: ganti adapter `js/data.js` ke Supabase (Auth, PostgreSQL,
+  RLS, Storage) — seluruh lapisan logika `js/logic.js` tetap dipakai tanpa perubahan;
+  tambah RLS `user_id` / `organization_id`; ubah pendaftaran ke Supabase Auth; lalu deploy ke Vercel.
+- Belum ada migrasi otomatis ke Supabase — kredensial tidak pernah disimpan di frontend.
+
+## Fitur lengkap
+
+- Dashboard 6 KPI (Balance, Income, Expense, Savings, DAPIN Outstanding, DAPIN Receivable)
+- Wallet multi-rekening (cash / bank / e-wallet) sebagai satu sumber saldo
+- Manajemen anggota (CRUD, cari, filter, profil per anggota dengan riwayat transaksi)
+- Simpanan configurable (Pokok / Wajib / Sukarela)
+- Pinjaman: pembuatan otomatis jadwal angsuran, kalkulasi bunga transparan
+- Installments, Payments, Due Dates (overdue, hari ini, mendatang) dengan peringatan visual
+- Ledger DAPIN permanen (SAVINGS_DEPOSIT, LOAN_CREATED, LOAN_DISBURSED, INSTALLMENT_PAYMENT, INTEREST_PAYMENT, ADJUSTMENT)
+- Laporan FINORA & DAPIN dengan ekspor **CSV** dan **Cetak/PDF** (window.print)
+- Notifikasi terintegrasi + badge, pencarian global (teknikal `/`), role-based access,
+  audit log, sidebar collapsible & mobile drawer, tabel responsif kartu di HP

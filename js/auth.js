@@ -1,73 +1,39 @@
-/**
- * FINORA × DAPIN — Auth Layer
- * Two-panel login: Admin vs Anggota.
- * Admin  → full access (dashboard, finance, DAPIN management, settings)
- * Anggota → limited panel (view own savings/loans, pay installments, apply for loans)
- */
-const Auth = (() => {
-  const SESSION_KEY = 'finora_dapin_session';
+/* FINORA x DAPIN — Auth (demo: verifikasi lokal; produksi: Supabase Auth + RLS) */
+(function (root) {
+  if (root.AUTH) return root.AUTH;
+  var SKEY = 'finora_session_v1';
 
-  function login(email, password) {
-    const user = Store.findUser(email, password);
-    if (!user) return { ok: false, error: 'Email atau password salah.' };
-    const session = {
-      userId: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      memberId: user.memberId,
-    };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    Store.addNotification({ type: 'info', title: 'Login berhasil', message: `${user.name} masuk sebagai ${user.role === 'admin' ? 'Administrator' : 'Anggota'}.` });
-    return { ok: true, session };
+  function session() { try { var s = JSON.parse(localStorage.getItem(SKEY)); return s; } catch (e) { return null; } }
+  function login(email, pass) {
+    var db = DB.load();
+    if (!db) return { ok: false, error: 'Database belum tersedia. Muat ulang halaman.' };
+    var u = db.users.find(function (x) { return x.email.toLowerCase() === String(email || '').toLowerCase().trim() && x.password === String(pass || ''); });
+    if (!u) return { ok: false, error: 'Email atau password salah.' };
+    var s = { userId: u.id, name: u.name, email: u.email, role: u.role, loggedAt: new Date().toISOString() };
+    localStorage.setItem(SKEY, JSON.stringify(s));
+    LG.addAudit(db, u.id, 'User login', 'user', u.id, {});
+    DB.save(db);
+    return { ok: true, session: s };
   }
-
+  function register(name, email, pass) {
+    var db = DB.load();
+    if (!name || !email || !pass) return { ok: false, error: 'Lengkapi nama, email, dan password.' };
+    if (String(pass).length < 6) return { ok: false, error: 'Password minimal 6 karakter.' };
+    email = String(email).toLowerCase().trim();
+    if (db.users.some(function (x) { return x.email === email; })) return { ok: false, error: 'Email sudah terdaftar.' };
+    var id = 'U' + (db.users.length + 1);
+    db.users.push({ id: id, name: String(name).trim(), email: email, password: String(pass), role: 'USER' });
+    db.profiles.push({ id: 'P' + id, user_id: id, full_name: String(name).trim(), phone: '', company: '' });
+    LG.addAudit(db, id, 'User registered', 'user', id, { email: email });
+    DB.save(db);
+    return login(email, pass);
+  }
   function logout() {
-    localStorage.removeItem(SESSION_KEY);
+    var db = DB.load(); var s = session();
+    if (db && s) { LG.addAudit(db, s.userId, 'User logout', 'user', s.userId, {}); DB.save(db); }
+    localStorage.removeItem(SKEY);
   }
-
-  function current() {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  }
-
-  function isAdmin() {
-    const s = current();
-    return s && s.role === 'admin';
-  }
-
-  function isMember() {
-    const s = current();
-    return s && s.role === 'member';
-  }
-
-  function requireAuth() {
-    const s = current();
-    if (!s) { App.go('login'); return false; }
-    return true;
-  }
-
-  function requireAdmin() {
-    if (!requireAuth()) return false;
-    if (!isAdmin()) { App.go('member-dashboard'); return false; }
-    return true;
-  }
-
-  /** All demo accounts for the login screen quick-fill */
-  function demoAccounts() {
-    return [
-      { label: 'Administrator',  email: 'admin@finora.com', password: 'admin123',  role: 'admin'  },
-      { label: 'Budi Santoso',   email: 'budi@finora.com',  password: 'member123', role: 'member' },
-      { label: 'Siti Rahayu',    email: 'siti@finora.com',  password: 'member123', role: 'member' },
-      { label: 'Agus Wijaya',    email: 'agus@finora.com',  password: 'member123', role: 'member' },
-      { label: 'Dewi Lestari',   email: 'dewi@finora.com',  password: 'member123', role: 'member' },
-      { label: 'Maya Putri',     email: 'maya@finora.com',  password: 'member123', role: 'member' },
-    ];
-  }
-
-  return { login, logout, current, isAdmin, isMember, requireAuth, requireAdmin, demoAccounts };
-})();
-
-if (typeof module !== 'undefined' && module.exports) module.exports = Auth;
+  function can(role, needed) { return needed === '*' || role === 'SUPER_ADMIN' || role === 'ADMIN' || role === needed; }
+  root.AUTH = { session: session, login: login, register: register, logout: logout, can: can };
+  return root.AUTH;
+})(typeof window !== 'undefined' ? window : globalThis);
