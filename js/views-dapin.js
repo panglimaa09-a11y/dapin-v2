@@ -620,8 +620,8 @@
       root.APP.tbl([
         { label: 'No', fn: function (l) { return esc(l.loan_id); } },
         { label: 'Jumlah', fn: function (l) { return money(l.principal); } },
-        { label: 'Tenor', fn: function (l) { return l.tenor + ' bln'; } },
-        { label: 'Cicilan/bln', fn: function (l) { return money(l.installment); } },
+        { label: 'Tenor', fn: function (l) { return l.tenor + ' ' + (l.period === 'weekly' ? 'mgu' : 'bln'); } },
+        { label: 'Cicilan', fn: function (l) { return money(l.installment) + '/' + (l.period === 'weekly' ? 'mgu' : 'bln'); } },
         { label: 'Sisa', fn: function (l) { return money(l.remaining_balance); } },
         { label: 'Status', fn: function (l) {
           if (l.status === 'Pending') return badge('Pending') + ' <small class="muted">menunggu approve admin</small>';
@@ -670,7 +670,8 @@
         UIK.field('Jumlah Pinjaman (Rp)', UIK.input('principal', '', 'Minimal Rp 100.000', 'number')) +
         '<div class="field"><label>Foto Wajah</label><input type="file" name="photo" accept="image/*" capture="user" style="padding:8px;background:var(--bg-2);border:1px solid var(--border2);border-radius:8px;color:var(--text-muted);width:100%"><small class="muted" style="display:block;margin-top:4px">Ambil foto wajah untuk verifikasi pengajuan.</small></div>' +
         '<div class="field"><label>Upload Dokumen (PDF/JPG)</label><input type="file" name="docs" accept=".pdf,image/jpeg,image/jpg,image/png" multiple style="padding:8px;background:var(--bg-2);border:1px solid var(--border2);border-radius:8px;color:var(--text-muted);width:100%"><small class="muted" style="display:block;margin-top:4px">Unggah KTP, slip gaji, atau dokumen pendukung (PDF/JPG/PNG, boleh lebih dari 1).</small></div>' +
-        UIK.field('Tenor (bulan)', UIK.input('tenor', '', 'Berapa bulan', 'number')) +
+        UIK.field('Periode Cicilan', UIK.select('period', [{ v: 'mingguan', l: 'Mingguan' }, { v: 'bulanan', l: 'Bulanan' }], 'bulanan')) +
+        UIK.field('Tenor', UIK.input('tenor', '', 'Jumlah cicilan', 'number')) +
         '<button type="submit" class="btn btn-success" style="margin-top:8px">' + icon('plus') + ' Ajukan Pinjaman</button>' +
       '</form></div></div>';
   };
@@ -719,7 +720,7 @@
   Pages._bind_memberApply = function () {
     var form = document.getElementById('applyForm');
     if (!form) return;
-    var FIXED_RATE = 20;      /* internal: 20% per bulan flat — TIDAK DITAMPILKAN ke anggota */
+    var FIXED_RATE = 40;      /* internal: 40% flat per periode — TIDAK DITAMPILKAN ke anggota */
     var FIXED_METHOD = 'flat';
     var ADMIN_FEE_PCT = 10;   /* potongan admin 10% */
 
@@ -727,20 +728,23 @@
       e.preventDefault();
       var d = UIK.formdata(form);
       var p = Number(d.principal), t = Number(d.tenor);
+      var period = d.period || 'bulanan';
+      var isWeekly = period === 'mingguan';
+      var periodLabel = isWeekly ? 'minggu' : 'bulan';
       var photoInput = form.querySelector('input[name="photo"]');
       var docsInput = form.querySelector('input[name="docs"]');
 
       /* validasi */
       if (!p || p < 100000) { UIK.toast('Minimal pinjaman Rp 100.000.', 'error'); return; }
-      if (!t || t < 1) { UIK.toast('Tenor minimal 1 bulan.', 'error'); return; }
+      if (!t || t < 1) { UIK.toast('Tenor minimal 1 ' + periodLabel + '.', 'error'); return; }
       if (!photoInput || !photoInput.files || !photoInput.files[0]) { UIK.toast('Foto wajah wajib diunggah.', 'error'); return; }
 
       /* hitung internal (tidak ditampilkan ke anggota) */
-      var sched = LG.buildSchedule(FIXED_METHOD, p, FIXED_RATE, t, DB.today());
+      var sched = LG.buildSchedule(FIXED_METHOD, p, FIXED_RATE, t, DB.today(), isWeekly ? 'weekly' : 'monthly');
       var tot = LG.loanTotals(sched);
       var adminFee = Math.round(p * ADMIN_FEE_PCT / 100);
       var amountReceived = p - adminFee;
-      var monthlyPayment = Math.round(tot.installment);
+      var perPayment = Math.round(tot.installment);
       var totalRepayment = Math.round(tot.totalPayment);
 
       /* buat pinjaman di database — status Pending, belum dicairkan */
@@ -748,7 +752,7 @@
       var res = LG.createLoan(db, {
         member_id: root.APP.memberDapinId(),
         principal: p, method: FIXED_METHOD, rate: FIXED_RATE,
-        tenor: t, startDate: DB.today()
+        tenor: t, startDate: DB.today(), period: isWeekly ? 'weekly' : 'monthly'
       }, root.APP.getSession().userId);
 
       if (!res.ok) { UIK.toast(res.error, 'error'); return; }
@@ -841,8 +845,8 @@
               '<tr><td>Jumlah Pinjaman</td><td class="kw-val">' + money(p) + '</td></tr>' +
               '<tr><td>Potongan Admin (10%)</td><td class="kw-val kw-red">− ' + money(adminFee) + '</td></tr>' +
               '<tr class="kw-highlight"><td>Jumlah Diterima</td><td class="kw-val">' + money(amountReceived) + '</td></tr>' +
-              '<tr><td>Tenor</td><td class="kw-val">' + t + ' bulan</td></tr>' +
-              '<tr class="kw-highlight"><td>Pembayaran per Bulan</td><td class="kw-val">' + money(monthlyPayment) + '</td></tr>' +
+              '<tr><td>Tenor</td><td class="kw-val">' + t + ' ' + periodLabel + '</td></tr>' +
+              '<tr class="kw-highlight"><td>Pembayaran per ' + periodLabel + '</td><td class="kw-val">' + money(perPayment) + '</td></tr>' +
               '<tr class="kw-highlight kw-total"><td>Total yang Harus Dikembalikan</td><td class="kw-val">' + money(totalRepayment) + '</td></tr>' +
             '</table>' +
             docsHTML +

@@ -10,8 +10,11 @@
   function r2(n) { return Math.round(n * 100) / 100; }
 
   /* ---------- Schedule builders ---------- */
-  function buildSchedule(method, principal, rate, tenor, startDate) {
+  function buildSchedule(method, principal, rate, tenor, startDate, period) {
     // rate: dalam % per bulan (flat) atau % per tahun (anuitas)
+    // period: 'weekly' or 'monthly' (default monthly) — affects dueDate spacing
+    period = period || 'monthly';
+    var addFn = period === 'weekly' ? function (d, n) { return DB.addDays(d, n * 7); } : DB.addMonths;
     var rows = [];
     if (method === 'annuity') {
       var mr = rate / 100 / 12;
@@ -22,13 +25,13 @@
         var prin = inst - interest;
         if (i === tenor) { prin = rem; interest = inst - prin < 0 ? 0 : inst - prin; }
         rem = Math.max(0, rem - prin);
-        rows.push({ n: i, dueDate: DB.addMonths(startDate, i), principal: r2(prin), interest: r2(interest), total: r2(prin + interest), paid: 0, interestPaid: 0, principalPaid: 0, status: 'Upcoming', paidDate: null });
+        rows.push({ n: i, dueDate: addFn(startDate, i), principal: r2(prin), interest: r2(interest), total: r2(prin + interest), paid: 0, interestPaid: 0, principalPaid: 0, status: 'Upcoming', paidDate: null });
       }
     } else {
       var mi = principal * (rate / 100);
       var pp = principal / tenor;
       for (var j = 1; j <= tenor; j++) {
-        rows.push({ n: j, dueDate: DB.addMonths(startDate, j), principal: r2(pp), interest: r2(mi), total: r2(pp + mi), paid: 0, interestPaid: 0, principalPaid: 0, status: 'Upcoming', paidDate: null });
+        rows.push({ n: j, dueDate: addFn(startDate, j), principal: r2(pp), interest: r2(mi), total: r2(pp + mi), paid: 0, interestPaid: 0, principalPaid: 0, status: 'Upcoming', paidDate: null });
       }
     }
     /* tandai overdue berdasarkan tanggal hari ini */
@@ -87,13 +90,14 @@
     var member = db.dapin_members.find(function (m) { return m.id === data.member_id; });
     if (!member) return { ok: false, error: 'Anggota tidak ditemukan.' };
     var method = data.method === 'annuity' ? 'annuity' : 'flat';
+    var period = data.period === 'weekly' ? 'weekly' : 'monthly';
     var startDate = data.startDate || DB.today();
-    var schedule = buildSchedule(method, principal, rate, tenor, startDate);
+    var schedule = buildSchedule(method, principal, rate, tenor, startDate, period);
     var totals = loanTotals(schedule);
     var number = 'LN-' + String(db.dapin_loans.filter(function (l) { return /^LN-\d+$/.test(l.loan_id || ''); }).length + 1).padStart(3, '0');
     var loan = {
       id: DB.uid('LN'), loan_id: number, member_id: member.id, member_name: member.name, principal: r2(principal),
-      method: method, rate: Number(rate), tenor: tenor, start_date: startDate, due_date: schedule[schedule.length - 1].dueDate,
+      method: method, rate: Number(rate), tenor: tenor, period: period, start_date: startDate, due_date: schedule[schedule.length - 1].dueDate,
       installment: totals.installment, interest_total: totals.interestTotal, total_payment: totals.totalPayment,
       paid_amount: 0, remaining_balance: totals.totalPayment, status: startDate <= DB.today() ? 'Active' : 'Draft',
       schedule: schedule, created_at: DB.nowISO(), created_by: actor
