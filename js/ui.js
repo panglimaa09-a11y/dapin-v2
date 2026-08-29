@@ -24,6 +24,7 @@ const UI = {
     if (title) card.appendChild(UI.el('div', { class: 'card-header' }, [UI.el('h3', {}, [title])]));
     const body = UI.el('div', { class: 'card-body' });
     if (typeof content === 'string') body.innerHTML = content;
+    else if (Array.isArray(content)) content.forEach(c => { if (c) body.appendChild(c); });
     else if (content) body.appendChild(content);
     card.appendChild(body);
     return card;
