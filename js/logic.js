@@ -246,15 +246,31 @@
   }
 
   /* ---------- DUE DATE HELPERS ---------- */
+  /* Denda keterlambatan: 5% per periode (minggu/bulan) dari sisa cicilan overdue */
+  var LATE_FEE_PCT = 5;
+
+  function calcLateFee(loan, row, today) {
+    if (row.status === 'Paid' || row.status === 'Upcoming') return 0;
+    if (row.dueDate >= today) return 0;
+    var periodDays = loan.period === 'weekly' ? 7 : 30;
+    var daysLate = DB.daysBetween(row.dueDate, today);
+    if (daysLate <= 0) return 0;
+    var periodsLate = Math.ceil(daysLate / periodDays);
+    var remaining = r2(row.total - row.paid);
+    var fee = remaining * LATE_FEE_PCT / 100 * periodsLate;
+    return r2(fee);
+  }
+
   function dueItems(db, daysAhead) {
     var today = DB.today(); var out = [];
     db.dapin_loans.forEach(function (loan) {
-      if (loan.status === 'Completed' || loan.status === 'Cancelled' || loan.status === 'Draft') return;
+      if (loan.status === 'Completed' || loan.status === 'Cancelled' || loan.status === 'Draft' || loan.status === 'Pending' || loan.status === 'Rejected') return;
       loan.schedule.forEach(function (row) {
         if (row.status === 'Paid') return;
         var d = DB.daysBetween(today, row.dueDate);
         if (d > (daysAhead || 7)) return;
-        out.push({ member: loan.member_name, loan: loan.loan_id, loan_id: loan.id, installment: row.n, dueDate: row.dueDate, amount: r2(row.total - row.paid), status: row.status === 'Partial' ? 'Partial' : (d < 0 ? 'Overdue' : (d === 0 ? 'DueToday' : 'Upcoming')), days: d });
+        var lateFee = calcLateFee(loan, row, today);
+        out.push({ member: loan.member_name, loan: loan.loan_id, loan_id: loan.id, installment: row.n, dueDate: row.dueDate, amount: r2(row.total - row.paid), lateFee: lateFee, totalWithFee: r2(row.total - row.paid + lateFee), status: row.status === 'Partial' ? 'Partial' : (d < 0 ? 'Overdue' : (d === 0 ? 'DueToday' : 'Upcoming')), days: d, periodsLate: lateFee > 0 ? Math.ceil(Math.abs(d) / (loan.period === 'weekly' ? 7 : 30)) : 0 });
       });
     });
     out.sort(function (a, b) { return (a.status === 'Overdue' ? -1 : 0) - (b.status === 'Overdue' ? -1 : 0) || a.dueDate.localeCompare(b.dueDate); });
@@ -328,6 +344,6 @@
     return { ok: true, loan: loan };
   }
 
-  root.LG = { buildSchedule: buildSchedule, loanTotals: loanTotals, refreshStatus: refreshStatus, createMember: createMember, createLoan: createLoan, processPayment: processPayment, recordSavings: recordSavings, recordAdjustment: recordAdjustment, createWallet: createWallet, updateMember: updateMember, deactivateMember: deactivateMember, notify: notify, addAudit: addAudit, dueItems: dueItems, memberStats: memberStats, financeTotals: financeTotals, approveLoan: approveLoan, rejectLoan: rejectLoan };
+  root.LG = { buildSchedule: buildSchedule, loanTotals: loanTotals, refreshStatus: refreshStatus, createMember: createMember, createLoan: createLoan, processPayment: processPayment, recordSavings: recordSavings, recordAdjustment: recordAdjustment, createWallet: createWallet, updateMember: updateMember, deactivateMember: deactivateMember, notify: notify, addAudit: addAudit, dueItems: dueItems, memberStats: memberStats, financeTotals: financeTotals, approveLoan: approveLoan, rejectLoan: rejectLoan, calcLateFee: calcLateFee, LATE_FEE_PCT: LATE_FEE_PCT };
   return root.LG;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -452,7 +452,7 @@
     function sec(title, tone, items) {
       return '<div class="card"><div class="card-t"><h3>' + title + ' <span class="badge ' + tone + '">' + items.length + '</span></h3></div>' +
         (items.length ? root.APP.tbl(
-          [{ label: 'Anggota', fn: function (d) { return '<div class="cell-user">' + root.APP.avatar(d.member, 30) + '<b>' + esc(d.member) + '</b></div>'; } }, { label: 'Pinjaman', k: 'loan' }, { label: 'Angsuran', fn: function (d) { return '#' + d.installment; } }, { label: 'Jatuh Tempo', fn: function (d) { return fmt.date(d.dueDate) + (d.days < 0 ? ' <span class="badge t-red">+(' + (-d.days) + ' hr)</span>' : ''); } }, { label: 'Jumlah', fn: function (d) { return '<b>' + money(d.amount) + '</b>'; } }, { label: 'Status', fn: function (d) { return badge(d.status === 'Overdue' ? 'Overdue' : d.status === 'DueToday' ? 'Due Today' : d.status === 'Partial' ? 'Partial' : 'Upcoming'); } }, { label: '', fn: function (d) { return root.APP.canManage() && d.status !== 'Paid' ? '<button class="btn btn-primary btn-xs" data-paydue="' + d.loan_id + '">Bayar</button>' : ''; } }],
+          [{ label: 'Anggota', fn: function (d) { return '<div class="cell-user">' + root.APP.avatar(d.member, 30) + '<b>' + esc(d.member) + '</b></div>'; } }, { label: 'Pinjaman', k: 'loan' }, { label: 'Angsuran', fn: function (d) { return '#' + d.installment; } }, { label: 'Jatuh Tempo', fn: function (d) { return fmt.date(d.dueDate) + (d.days < 0 ? ' <span class="badge t-red">+(' + (-d.days) + ' hr)</span>' : ''); } }, { label: 'Cicilan', fn: function (d) { return money(d.amount); } }, { label: 'Denda', fn: function (d) { return d.lateFee > 0 ? '<span class="neg">' + money(d.lateFee) + '</span>' : '<span class="muted">—</span>'; } }, { label: 'Total', fn: function (d) { return '<b>' + money(d.totalWithFee) + '</b>'; } }, { label: 'Status', fn: function (d) { return badge(d.status === 'Overdue' ? 'Overdue' : d.status === 'DueToday' ? 'Due Today' : d.status === 'Partial' ? 'Partial' : 'Upcoming'); } }, { label: '', fn: function (d) { return root.APP.canManage() && d.status !== 'Paid' ? '<button class="btn btn-primary btn-xs" data-paydue="' + d.loan_id + '">Bayar</button>' : ''; } }],
           items, { emptyTitle: 'Tidak ada', emptyIcon: 'check' }) : '<p class="muted pad">Tidak ada.</p>') + '</div>';
     }
     return root.APP.pageHead('Due Dates', 'Sistem jatuh tempo — pantau pembayaran hari ini, mendatang, dan terlambat') +
@@ -603,8 +603,9 @@
       (due.length ? '<div class="card"><div class="card-t"><h3>Angsuran Jatuh Tempo</h3></div>' + root.APP.tbl([
         { label: 'Pinjaman', fn: function (r) { return esc(r.loan); } },
         { label: 'Cicilan', fn: function (r) { return '#' + r.installment; } },
-        { label: 'Jatuh Tempo', fn: function (r) { return esc(fmt.date(r.dueDate)); } },
         { label: 'Jumlah', fn: function (r) { return money(r.amount); } },
+        { label: 'Denda', fn: function (r) { return r.lateFee > 0 ? '<span class="neg">' + money(r.lateFee) + '</span>' : '<span class="muted">—</span>'; } },
+        { label: 'Jatuh Tempo', fn: function (r) { return esc(fmt.date(r.dueDate)); } },
         { label: 'Status', fn: function (r) { return badge(r.status); } }
       ], due.slice(0, 5)) + '</div>' : UIK.emptyState('check', 'Tidak ada angsuran jatuh tempo', 'Semua cicilan lancar! 🎉'));
   };
@@ -636,24 +637,31 @@
   Pages.memberPay = function () {
     var db = root.APP.getDB();
     var mid = root.APP.memberDapinId();
+    var today = DB.today();
     var loans = db.dapin_loans.filter(function (l) { return l.member_id === mid && (l.status === 'Active' || l.status === 'Overdue'); });
     if (!loans.length) return root.APP.pageHead('Bayar Angsuran', 'Tidak ada pinjaman aktif') +
       '<a class="btn btn-success" href="#/member/apply">' + icon('plus') + ' Ajukan Pinjaman</a>';
     var items = [];
     loans.forEach(function (l) {
       l.schedule.forEach(function (r) {
-        if (r.status !== 'Paid') items.push({ loan: l, row: r });
+        if (r.status !== 'Paid') {
+          var fee = LG.calcLateFee(l, r, today);
+          items.push({ loan: l, row: r, lateFee: fee });
+        }
       });
     });
     if (!items.length) return root.APP.pageHead('Bayar Angsuran', 'Semua angsuran sudah lunas! 🎉');
-    return root.APP.pageHead('Bayar Angsuran', items.length + ' angsuran belum dibayar') +
+    var totalLateFee = items.reduce(function (s, i) { return s + i.lateFee; }, 0);
+    return root.APP.pageHead('Bayar Angsuran', items.length + ' angsuran belum dibayar' + (totalLateFee > 0 ? ' · Total denda: ' + money(totalLateFee) : '')) +
       root.APP.tbl([
         { label: 'Pinjaman', fn: function (r) { return esc(r.loan.loan_id); } },
         { label: 'Cicilan', fn: function (r) { return '#' + r.row.n; } },
-        { label: 'Jumlah', fn: function (r) { return money(r.row.total - r.row.paid); } },
+        { label: 'Cicilan', fn: function (r) { return money(r.row.total - r.row.paid); } },
+        { label: 'Denda', fn: function (r) { return r.lateFee > 0 ? '<span class="neg">' + money(r.lateFee) + '</span>' : '<span class="muted">—</span>'; } },
+        { label: 'Total', fn: function (r) { return '<b>' + money(r.row.total - r.row.paid + r.lateFee) + '</b>'; } },
         { label: 'Jatuh Tempo', fn: function (r) { return esc(fmt.date(r.row.dueDate)); } },
         { label: 'Status', fn: function (r) { return badge(r.row.status); } },
-        { label: '', fn: function (r) { return '<button class="btn btn-success btn-sm" data-pay-loan="' + r.loan.id + '" data-pay-amt="' + (r.row.total - r.row.paid) + '">Bayar</button>'; } }
+        { label: '', fn: function (r) { return '<button class="btn btn-success btn-sm" data-pay-loan="' + r.loan.id + '" data-pay-amt="' + (r.row.total - r.row.paid + r.lateFee) + '" data-pay-base="' + (r.row.total - r.row.paid) + '" data-pay-fee="' + r.lateFee + '">Bayar</button>'; } }
       ], items);
   };
 
@@ -704,14 +712,18 @@
       b.onclick = function () {
         var loanId = b.getAttribute('data-pay-loan');
         var amt = Number(b.getAttribute('data-pay-amt'));
+        var base = Number(b.getAttribute('data-pay-base') || amt);
+        var fee = Number(b.getAttribute('data-pay-fee') || 0);
         var db = root.APP.getDB();
         var loan = db.dapin_loans.find(function (l) { return l.id === loanId; });
-        UIK.confirmModal('Bayar Angsuran', 'Anda akan membayar ' + root.APP.money(amt) + ' untuk pinjaman ' + loan.loan_id + '. Saldo pinjaman akan berkurang.', 'Bayar', function () {
+        var msg = 'Anda akan membayar ' + root.APP.money(amt) + ' untuk pinjaman ' + loan.loan_id + '.';
+        if (fee > 0) msg += '\n\nCicilan: ' + root.APP.money(base) + '\nDenda keterlambatan: ' + root.APP.money(fee) + '\nTotal: ' + root.APP.money(amt);
+        UIK.confirmModal('Bayar Angsuran', msg, 'Bayar', function () {
           var res = LG.processPayment(db, { loan_id: loanId, amount: amt, wallet_id: db.wallets[0].id, method: 'transfer' }, root.APP.getSession().userId);
           if (!res.ok) { UIK.toast(res.error, 'error'); return; }
           root.APP.saveDB();
           root.APP.afterMutate();
-          UIK.toast('Pembayaran ' + res.payId + ' berhasil! ✅', 'success');
+          UIK.toast('Pembayaran ' + res.payId + ' berhasil! ✅' + (fee > 0 ? ' (termasuk denda ' + root.APP.money(fee) + ')' : ''), 'success');
           location.hash = '#/member/loans';
         });
       };
