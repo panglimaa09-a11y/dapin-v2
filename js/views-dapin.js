@@ -246,6 +246,9 @@
           var b = '<button class="btn btn-ghost btn-xs" data-loan="' + l.id + '">Jadwal</button>';
           if (root.APP.canManage() && (l.status === 'Active' || l.status === 'Overdue')) b += '<button class="btn btn-primary btn-xs" data-pay="' + l.id + '">Bayar</button>';
           if (root.APP.canManage() && l.status === 'Draft') b += '<button class="btn btn-danger-ghost btn-xs" data-cancel="' + l.id + '">Batal</button>';
+          if (root.APP.canManage() && l.status === 'Pending') b += '<button class="btn btn-success btn-xs" data-approve="' + l.id + '">Approve</button><button class="btn btn-danger-ghost btn-xs" data-reject="' + l.id + '">Tolak</button>';
+          if (l.status === 'Pending' && l.photo) b += '<button class="btn btn-ghost btn-xs" data-view-photo="' + l.id + '">Foto</button>';
+          if (l.status === 'Pending' && l.documents && l.documents.length) b += '<button class="btn btn-ghost btn-xs" data-view-docs="' + l.id + '">Dok (' + l.documents.length + ')</button>';
           return b; } }],
         db.dapin_loans.slice().sort(function (a, b) { return b.created_at.localeCompare(a.created_at); }), { emptyTitle: 'Belum ada pinjaman', emptyIcon: 'loans' }
       ) + '</div>';
@@ -260,6 +263,51 @@
         l.status = 'Cancelled';
         root.APP.afterMutate(); UIK.toast('Pinjaman dibatalkan.', 'success'); renderAgain('loans');
       });
+    }; });
+    /* Approve pengajuan anggota */
+    document.querySelectorAll('[data-approve]').forEach(function (b) { b.onclick = function () {
+      var id = b.getAttribute('data-approve');
+      var loan = root.APP.getDB().dapin_loans.find(function (l) { return l.id === id; });
+      UIK.confirmModal('Approve Pinjaman', 'Setujui pengajuan ' + loan.loan_id + ' — ' + loan.member_name + ' (' + root.APP.money(loan.principal) + ')? Pinjaman akan langsung dicairkan.', 'Approve & Cairkan', function () {
+        var db = root.APP.getDB();
+        var res = LG.approveLoan(db, id, root.APP.getSession().userId);
+        if (!res.ok) { UIK.toast(res.error, 'error'); return; }
+        root.APP.saveDB(); root.APP.afterMutate();
+        UIK.toast('Pinjaman ' + loan.loan_id + ' disetujui & dicairkan! ✅', 'success');
+        renderAgain('loans');
+      });
+    }; });
+    /* Reject pengajuan anggota */
+    document.querySelectorAll('[data-reject]').forEach(function (b) { b.onclick = function () {
+      var id = b.getAttribute('data-reject');
+      var loan = root.APP.getDB().dapin_loans.find(function (l) { return l.id === id; });
+      UIK.confirmModal('Tolak Pinjaman', 'Tolak pengajuan ' + loan.loan_id + ' — ' + loan.member_name + '?', 'Tolak', function () {
+        var db = root.APP.getDB();
+        var res = LG.rejectLoan(db, id, root.APP.getSession().userId, 'Ditolak oleh admin');
+        if (!res.ok) { UIK.toast(res.error, 'error'); return; }
+        root.APP.saveDB(); root.APP.afterMutate();
+        UIK.toast('Pinjaman ' + loan.loan_id + ' ditolak.', 'info');
+        renderAgain('loans');
+      });
+    }; });
+    /* Lihat foto wajah pengajuan */
+    document.querySelectorAll('[data-view-photo]').forEach(function (b) { b.onclick = function () {
+      var loan = root.APP.getDB().dapin_loans.find(function (l) { return l.id === b.getAttribute('data-view-photo'); });
+      if (loan && loan.photo) UIK.openModal('<h3>Foto Wajah — ' + esc(loan.loan_id) + '</h3><p class="muted">' + esc(loan.member_name) + '</p><img src="' + loan.photo + '" style="width:100%;border-radius:8px;margin-top:12px">', true);
+    }; });
+    /* Lihat dokumen pendukung */
+    document.querySelectorAll('[data-view-docs]').forEach(function (b) { b.onclick = function () {
+      var loan = root.APP.getDB().dapin_loans.find(function (l) { return l.id === b.getAttribute('data-view-docs'); });
+      if (!loan || !loan.documents) return;
+      var html = '<h3>Dokumen Pendukung — ' + esc(loan.loan_id) + '</h3><p class="muted">' + esc(loan.member_name) + '</p><ul style="list-style:none;padding:0;margin-top:12px">';
+      loan.documents.forEach(function (doc) {
+        var isImg = doc.fileType && doc.fileType.indexOf('image') >= 0;
+        if (isImg && doc.data) html += '<li style="margin-bottom:12px"><a href="' + doc.data + '" download="' + esc(doc.name) + '" style="color:var(--primary)">' + esc(doc.name) + '</a><br><img src="' + doc.data + '" style="max-width:100%;border-radius:8px;margin-top:6px;border:1px solid var(--border2)"></li>';
+        else if (doc.data) html += '<li style="margin-bottom:8px"><a href="' + doc.data + '" download="' + esc(doc.name) + '" style="color:var(--primary)">' + esc(doc.name) + '</a></li>';
+        else html += '<li style="margin-bottom:8px">' + esc(doc.name) + ' <span class="muted">(gagal)</span></li>';
+      });
+      html += '</ul>';
+      UIK.openModal(html, true);
     }; });
     var b = document.getElementById('btnCreateLoan'); if (b) b.onclick = function () { openLoanModal(); };
   };
@@ -571,13 +619,15 @@
     return root.APP.pageHead('Pinjaman Saya', loans.length + ' pinjaman tercatat') +
       root.APP.tbl([
         { label: 'No', fn: function (l) { return esc(l.loan_id); } },
-        { label: 'Pokok', fn: function (l) { return money(l.principal); } },
-        { label: 'Bunga', fn: function (l) { return l.rate + (l.method === 'annuity' ? '%/thn' : '%/bln'); } },
-        { label: 'Metode', fn: function (l) { return l.method === 'annuity' ? 'Anuitas' : 'Flat'; } },
+        { label: 'Jumlah', fn: function (l) { return money(l.principal); } },
         { label: 'Tenor', fn: function (l) { return l.tenor + ' bln'; } },
-        { label: 'Cicilan', fn: function (l) { return money(l.installment); } },
+        { label: 'Cicilan/bln', fn: function (l) { return money(l.installment); } },
         { label: 'Sisa', fn: function (l) { return money(l.remaining_balance); } },
-        { label: 'Status', fn: function (l) { return badge(l.status); } },
+        { label: 'Status', fn: function (l) {
+          if (l.status === 'Pending') return badge('Pending') + ' <small class="muted">menunggu approve admin</small>';
+          if (l.status === 'Rejected') return badge('Rejected') + (l.rejectReason ? ' <small class="muted">' + esc(l.rejectReason) + '</small>' : '');
+          return badge(l.status);
+        } },
         { label: '', fn: function (l) { return '<button class="btn btn-ghost btn-sm" data-loan="' + l.id + '">' + icon('eye') + ' Detail</button>'; } }
       ], loans);
   };
@@ -693,7 +743,7 @@
       var monthlyPayment = Math.round(tot.installment);
       var totalRepayment = Math.round(tot.totalPayment);
 
-      /* buat pinjaman di database */
+      /* buat pinjaman di database — status Pending, belum dicairkan */
       var db = root.APP.getDB();
       var res = LG.createLoan(db, {
         member_id: root.APP.memberDapinId(),
@@ -702,6 +752,10 @@
       }, root.APP.getSession().userId);
 
       if (!res.ok) { UIK.toast(res.error, 'error'); return; }
+
+      /* OVERRIDE: anggota ajukan → Pending, tidak langsung cair */
+      res.loan.status = 'Pending';
+      res.loan.approved = false;
 
       /* kumpulkan semua file: foto wajah + dokumen pendukung */
       var allFiles = [];
@@ -793,17 +847,16 @@
             '</table>' +
             docsHTML +
             '<div class="kwitansi-foot">' +
-              '<p class="muted">Kwintansi ini sebagai bukti pengajuan pinjaman. Simpan baik-baik.</p>' +
+              '<p class="muted">Pengajuan Anda telah terkirim. Menunggu persetujuan admin. Anda akan melihat status pinjaman di halaman Pinjaman Saya.</p>' +
               '<div class="kwitansi-actions">' +
                 '<button class="btn btn-ghost" data-close>Tutup</button>' +
-                '<button class="btn btn-primary" id="kwPrint" onclick="window.print()">🖨️ Cetak</button>' +
                 '<a class="btn btn-success" href="#/member/loans">Lihat Pinjaman Saya</a>' +
               '</div>' +
             '</div>' +
           '</div>';
 
         UIK.openModal(kwitansiHTML, true);
-        UIK.toast('Pinjaman ' + loanNum + ' berhasil diajukan! ✅', 'success');
+        UIK.toast('Pengajuan ' + loanNum + ' terkirim! Menunggu approve admin.', 'success');
       }
     };
   };

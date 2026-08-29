@@ -290,6 +290,40 @@
     return { income: r2(income), expense: r2(expense), balance: r2(balance), savings: r2(savings), outstanding: r2(outstanding), receivable: r2(receivable) };
   }
 
-  root.LG = { buildSchedule: buildSchedule, loanTotals: loanTotals, refreshStatus: refreshStatus, createMember: createMember, createLoan: createLoan, processPayment: processPayment, recordSavings: recordSavings, recordAdjustment: recordAdjustment, createWallet: createWallet, updateMember: updateMember, deactivateMember: deactivateMember, notify: notify, addAudit: addAudit, dueItems: dueItems, memberStats: memberStats, financeTotals: financeTotals };
+  /* ---------- APPROVE LOAN (admin setujui pengajuan anggota) ---------- */
+  function approveLoan(db, loanId, actor) {
+    var loan = db.dapin_loans.find(function (l) { return l.id === loanId; });
+    if (!loan) return { ok: false, error: 'Pinjaman tidak ditemukan.' };
+    if (loan.status !== 'Pending') return { ok: false, error: 'Pinjaman ini bukan status Pending.' };
+    loan.status = 'Active';
+    loan.approved = true;
+    loan.approvedBy = actor;
+    loan.approvedDate = DB.nowISO();
+    /* pencairan: dana keluar dari wallet */
+    var wallet = db.wallets[0];
+    wallet.balance = Math.max(0, r2(wallet.balance - loan.principal));
+    db.transactions.push({ id: DB.uid('TXN'), user_id: db.sessionUser || null, type: 'expense', category: 'DAPIN · Pencairan', amount: loan.principal, date: DB.today(), wallet_id: wallet.id, reference: loan.loan_id, notes: 'Pencairan pinjaman ' + loan.loan_id + ' — ' + loan.member_name + ' (approved)', created_at: DB.nowISO() });
+    db.dapin_ledger.push({ id: DB.uid('LED'), member_id: loan.member_id, loan_id: loan.id, type: 'LOAN_DISBURSED', amount: loan.principal, date: DB.today(), reference: loan.loan_id, notes: 'Pencairan pinjaman ' + loan.loan_id + ' (approved by ' + actor + ')', created_by: actor, created_at: DB.nowISO() });
+    addAudit(db, actor, 'Loan approved & disbursed', 'loan', loan.id, { loan_id: loan.loan_id, member: loan.member_name, principal: loan.principal });
+    notify(db, 'Pinjaman ' + loan.loan_id + ' (' + loan.member_name + ') disetujui & dicairkan ' + FMT.money(loan.principal) + '.', 'success', '#/dapin/loans');
+    return { ok: true, loan: loan };
+  }
+
+  /* ---------- REJECT LOAN (admin tolak pengajuan anggota) ---------- */
+  function rejectLoan(db, loanId, actor, reason) {
+    var loan = db.dapin_loans.find(function (l) { return l.id === loanId; });
+    if (!loan) return { ok: false, error: 'Pinjaman tidak ditemukan.' };
+    if (loan.status !== 'Pending') return { ok: false, error: 'Pinjaman ini bukan status Pending.' };
+    loan.status = 'Rejected';
+    loan.approved = false;
+    loan.rejectedBy = actor;
+    loan.rejectedDate = DB.nowISO();
+    loan.rejectReason = reason || '';
+    addAudit(db, actor, 'Loan rejected', 'loan', loan.id, { loan_id: loan.loan_id, member: loan.member_name, reason: reason || '' });
+    notify(db, 'Pinjaman ' + loan.loan_id + ' (' + loan.member_name + ') ditolak.', 'warn', '#/dapin/loans');
+    return { ok: true, loan: loan };
+  }
+
+  root.LG = { buildSchedule: buildSchedule, loanTotals: loanTotals, refreshStatus: refreshStatus, createMember: createMember, createLoan: createLoan, processPayment: processPayment, recordSavings: recordSavings, recordAdjustment: recordAdjustment, createWallet: createWallet, updateMember: updateMember, deactivateMember: deactivateMember, notify: notify, addAudit: addAudit, dueItems: dueItems, memberStats: memberStats, financeTotals: financeTotals, approveLoan: approveLoan, rejectLoan: rejectLoan };
   return root.LG;
 })(typeof window !== 'undefined' ? window : globalThis);

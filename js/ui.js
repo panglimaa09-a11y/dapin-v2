@@ -60,7 +60,7 @@
     datetime: function (iso) { if (!iso) return '—'; var d = new Date(iso); return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
   };
 
-  var STATUS_TONE = { Active: 't-green', Inactive: 't-gray', Draft: 't-gray', Completed: 't-green', Cancelled: 't-gray', Overdue: 't-red', 'Due Today': 't-orange', DueToday: 't-orange', Upcoming: 't-blue', Due: 't-orange', Paid: 't-green', Partial: 't-orange', upcoming: 't-blue', overdue: 't-red', paid: 't-green', partial: 't-orange' };
+  var STATUS_TONE = { Active: 't-green', Inactive: 't-gray', Draft: 't-gray', Completed: 't-green', Cancelled: 't-gray', Overdue: 't-red', 'Due Today': 't-orange', DueToday: 't-orange', Upcoming: 't-blue', Due: 't-orange', Paid: 't-green', Partial: 't-orange', upcoming: 't-blue', overdue: 't-red', paid: 't-green', partial: 't-orange', Pending: 't-orange', Rejected: 't-red' };
   function badge(s) {
     var tone = STATUS_TONE[s] || 't-gray';
     return '<span class="badge ' + tone + '">' + esc(s) + '</span>';
