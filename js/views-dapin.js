@@ -618,10 +618,9 @@
       '<div class="card"><div class="card-t"><h3>Form Pengajuan</h3></div><div class="card-body">' +
       '<form id="applyForm">' +
         UIK.field('Jumlah Pinjaman (Rp)', UIK.input('principal', '', 'Minimal Rp 100.000', 'number')) +
-        UIK.field('Metode Bunga', UIK.select('method', [{ v: 'flat', l: 'Flat' }, { v: 'annuity', l: 'Anuitas' }], 'flat')) +
-        UIK.field('Bunga (%)', UIK.input('rate', '1.2', 'Bunga per bulan (flat) atau per tahun (anuitas)', 'number')) +
         UIK.field('Tenor (bulan)', UIK.input('tenor', '', '1–120 bulan', 'number')) +
-        '<div id="applyPreview" class="muted" style="margin:12px 0;padding:12px;background:var(--bg-2);border-radius:8px">Isi form untuk melihat preview cicilan.</div>' +
+        '<div class="field"><label>Bunga &amp; Metode</label><div class="muted" style="padding:10px 12px;background:var(--bg-2);border-radius:8px;border:1px solid var(--border2)"><b>8% per bulan — Flat</b><br><small>Ditetapkan otomatis oleh sistem. Anggota tidak dapat mengubah bunga.</small></div></div>' +
+        '<div id="applyPreview" class="muted" style="margin:12px 0;padding:12px;background:var(--bg-2);border-radius:8px">Isi jumlah dan tenor untuk melihat preview cicilan.</div>' +
         '<button type="submit" class="btn btn-success">' + icon('plus') + ' Ajukan Sekarang</button>' +
       '</form></div></div>';
   };
@@ -671,11 +670,13 @@
     var form = document.getElementById('applyForm');
     if (!form) return;
     var preview = document.getElementById('applyPreview');
+    var FIXED_RATE = 8;     /* bunga tetap 8% per bulan (flat) */
+    var FIXED_METHOD = 'flat';
     function updatePreview() {
       var d = UIK.formdata(form);
-      var p = Number(d.principal), t = Number(d.tenor), r = Number(d.rate);
+      var p = Number(d.principal), t = Number(d.tenor);
       if (p > 0 && t > 0) {
-        var sched = LG.buildSchedule(d.method, p, r, t, DB.today());
+        var sched = LG.buildSchedule(FIXED_METHOD, p, FIXED_RATE, t, DB.today());
         var tot = LG.loanTotals(sched);
         preview.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
           '<div><b>Cicilan/bulan:</b><br>' + money(tot.installment) + '</div>' +
@@ -683,7 +684,7 @@
           '<div><b>Total bayar:</b><br>' + money(tot.totalPayment) + '</div>' +
           '<div><b>Jumlah cicilan:</b><br>' + t + 'x</div></div>';
       } else {
-        preview.innerHTML = 'Isi form untuk melihat preview cicilan.';
+        preview.innerHTML = 'Isi jumlah dan tenor untuk melihat preview cicilan.';
         preview.className = 'muted';
       }
     }
@@ -691,15 +692,15 @@
     form.onsubmit = function (e) {
       e.preventDefault();
       var d = UIK.formdata(form);
-      var p = Number(d.principal), t = Number(d.tenor), r = Number(d.rate);
+      var p = Number(d.principal), t = Number(d.tenor);
       if (!p || p < 100000) { UIK.toast('Minimal pinjaman Rp 100.000.', 'error'); return; }
       if (!t || t < 1) { UIK.toast('Tenor minimal 1 bulan.', 'error'); return; }
       var db = root.APP.getDB();
-      var res = LG.createLoan(db, { member_id: root.APP.memberDapinId(), principal: p, method: d.method, rate: r, tenor: t, startDate: DB.today() }, root.APP.getSession().userId);
+      var res = LG.createLoan(db, { member_id: root.APP.memberDapinId(), principal: p, method: FIXED_METHOD, rate: FIXED_RATE, tenor: t, startDate: DB.today() }, root.APP.getSession().userId);
       if (!res.ok) { UIK.toast(res.error, 'error'); return; }
       root.APP.saveDB();
       root.APP.afterMutate();
-      UIK.toast('Pinjaman ' + res.loan.loan_id + ' diajukan & disetujui! ✅', 'success');
+      UIK.toast('Pinjaman ' + res.loan.loan_id + ' diajukan & disetujui! ✅ Bunga 8%/bln flat.', 'success');
       location.hash = '#/member/loans';
     };
   };
