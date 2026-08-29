@@ -1,0 +1,49 @@
+# FINORA × DAPIN — .gitignore
+# Static SPA (HTML/CSS/JS, no build step)
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.local
+config.local.js
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build artifacts
+dist/
+build/
+.cache/
+.vite/
+
+# Temp files
+*.tmp
+*.bak
+*.orig
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.zip
+*.tar.gz
