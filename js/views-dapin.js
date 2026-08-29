@@ -619,6 +619,7 @@
       '<form id="applyForm">' +
         UIK.field('Jumlah Pinjaman (Rp)', UIK.input('principal', '', 'Minimal Rp 100.000', 'number')) +
         '<div class="field"><label>Foto Wajah</label><input type="file" name="photo" accept="image/*" capture="user" style="padding:8px;background:var(--bg-2);border:1px solid var(--border2);border-radius:8px;color:var(--text-muted);width:100%"><small class="muted" style="display:block;margin-top:4px">Ambil foto wajah untuk verifikasi pengajuan.</small></div>' +
+        '<div class="field"><label>Upload Dokumen (PDF/JPG)</label><input type="file" name="docs" accept=".pdf,image/jpeg,image/jpg,image/png" multiple style="padding:8px;background:var(--bg-2);border:1px solid var(--border2);border-radius:8px;color:var(--text-muted);width:100%"><small class="muted" style="display:block;margin-top:4px">Unggah KTP, slip gaji, atau dokumen pendukung (PDF/JPG/PNG, boleh lebih dari 1).</small></div>' +
         UIK.field('Tenor (bulan)', UIK.input('tenor', '', 'Berapa bulan', 'number')) +
         '<button type="submit" class="btn btn-success" style="margin-top:8px">' + icon('plus') + ' Ajukan Pinjaman</button>' +
       '</form></div></div>';
@@ -677,6 +678,7 @@
       var d = UIK.formdata(form);
       var p = Number(d.principal), t = Number(d.tenor);
       var photoInput = form.querySelector('input[name="photo"]');
+      var docsInput = form.querySelector('input[name="docs"]');
 
       /* validasi */
       if (!p || p < 100000) { UIK.toast('Minimal pinjaman Rp 100.000.', 'error'); return; }
@@ -701,10 +703,47 @@
 
       if (!res.ok) { UIK.toast(res.error, 'error'); return; }
 
-      /* simpan foto sebagai base64 di loan (demo) */
-      var reader = new FileReader();
-      reader.onload = function (ev) {
-        res.loan.photo = ev.target.result;
+      /* kumpulkan semua file: foto wajah + dokumen pendukung */
+      var allFiles = [];
+      /* foto wajah — wajib */
+      allFiles.push({ name: photoInput.files[0].name, file: photoInput.files[0], type: 'photo' });
+      /* dokumen pendukung — opsional, boleh multiple */
+      if (docsInput && docsInput.files) {
+        for (var i = 0; i < docsInput.files.length; i++) {
+          allFiles.push({ name: docsInput.files[i].name, file: docsInput.files[i], type: 'doc' });
+        }
+      }
+
+      /* baca semua file sebagai base64 secara paralel */
+      var fileResults = [];
+      var done = 0;
+      var total = allFiles.length;
+
+      allFiles.forEach(function (item, idx) {
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+          fileResults[idx] = { name: item.name, data: ev.target.result, type: item.type, fileType: item.file.type };
+          done++;
+          if (done === total) finishSubmit();
+        };
+        reader.onerror = function () {
+          fileResults[idx] = { name: item.name, data: null, type: item.type, fileType: item.file.type };
+          done++;
+          if (done === total) finishSubmit();
+        };
+        reader.readAsDataURL(item.file);
+      });
+
+      function finishSubmit() {
+        /* simpan foto & dokumen ke loan */
+        var photoData = null;
+        var docsList = [];
+        fileResults.forEach(function (r) {
+          if (r.type === 'photo' && r.data) photoData = r.data;
+          else if (r.type === 'doc') docsList.push({ name: r.name, data: r.data, fileType: r.fileType });
+        });
+        res.loan.photo = photoData;
+        res.loan.documents = docsList;
         root.APP.saveDB();
         root.APP.afterMutate();
 
@@ -714,6 +753,23 @@
         var todayStr = fmt.date(DB.today());
         var memberName = member ? member.name : '—';
         var memberId = member ? member.member_id : '—';
+
+        /* dokumen list untuk kwitansi */
+        var docsHTML = '';
+        if (docsList.length > 0) {
+          docsHTML = '<div class="kwitansi-docs"><div class="kw-docs-title">Dokumen Pendukung (' + docsList.length + '):</div><ul class="kw-docs-list">';
+          docsList.forEach(function (doc) {
+            var isImg = doc.fileType && doc.fileType.indexOf('image') >= 0;
+            if (isImg && doc.data) {
+              docsHTML += '<li class="kw-doc-item"><a href="' + doc.data + '" target="_blank" download="' + esc(doc.name) + '">' + icon('reports') + esc(doc.name) + '</a><img src="' + doc.data + '" style="width:40px;height:40px;border-radius:4px;object-fit:cover;margin-left:8px"></li>';
+            } else if (doc.data) {
+              docsHTML += '<li class="kw-doc-item"><a href="' + doc.data + '" target="_blank" download="' + esc(doc.name) + '">' + icon('reports') + esc(doc.name) + '</a></li>';
+            } else {
+              docsHTML += '<li class="kw-doc-item">' + icon('reports') + esc(doc.name) + ' <small class="muted">(gagal dibaca)</small></li>';
+            }
+          });
+          docsHTML += '</ul></div>';
+        }
 
         var kwitansiHTML =
           '<div class="kwitansi">' +
@@ -725,7 +781,7 @@
               '<div><small>Tanggal</small><span>' + esc(todayStr) + '</span></div>' +
               '<div><small>Nama Anggota</small><span>' + esc(memberName) + '</span></div>' +
               '<div><small>ID Anggota</small><span>' + esc(memberId) + '</span></div>' +
-              '<div class="kwitansi-photo"><small>Foto Wajah</small><img src="' + ev.target.result + '" style="width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--border2)"></div>' +
+              '<div class="kwitansi-photo"><small>Foto Wajah</small>' + (photoData ? '<img src="' + photoData + '" style="width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--border2)">' : '<span class="muted">—</span>') + '</div>' +
             '</div>' +
             '<table class="kwitansi-table">' +
               '<tr><td>Jumlah Pinjaman</td><td class="kw-val">' + money(p) + '</td></tr>' +
@@ -735,6 +791,7 @@
               '<tr class="kw-highlight"><td>Pembayaran per Bulan</td><td class="kw-val">' + money(monthlyPayment) + '</td></tr>' +
               '<tr class="kw-highlight kw-total"><td>Total yang Harus Dikembalikan</td><td class="kw-val">' + money(totalRepayment) + '</td></tr>' +
             '</table>' +
+            docsHTML +
             '<div class="kwitansi-foot">' +
               '<p class="muted">Kwintansi ini sebagai bukti pengajuan pinjaman. Simpan baik-baik.</p>' +
               '<div class="kwitansi-actions">' +
@@ -747,8 +804,7 @@
 
         UIK.openModal(kwitansiHTML, true);
         UIK.toast('Pinjaman ' + loanNum + ' berhasil diajukan! ✅', 'success');
-      };
-      reader.readAsDataURL(photoInput.files[0]);
+      }
     };
   };
 })(typeof window !== 'undefined' ? window : globalThis);

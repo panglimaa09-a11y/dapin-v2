@@ -93,6 +93,15 @@ small { font-size: 12px; }
 .kwitansi-foot .muted { font-size:12px; margin-bottom:12px; }
 .kwitansi-actions { display:flex; gap:8px; flex-wrap:wrap; }
 
+/* dokumen pendukung di kwitansi */
+.kwitansi-docs { margin-bottom:16px; padding:12px; background:var(--bg-2); border-radius:8px; border:1px solid var(--border2); }
+.kw-docs-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:8px; }
+.kw-docs-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; }
+.kw-doc-item { display:flex; align-items:center; gap:6px; font-size:13px; padding:6px 8px; background:var(--bg-1); border-radius:6px; }
+.kw-doc-item .ic { width:16px; height:16px; color:var(--primary); flex-shrink:0; }
+.kw-doc-item a { color:var(--text); text-decoration:none; display:flex; align-items:center; gap:6px; }
+.kw-doc-item a:hover { color:var(--primary); }
+
 .btn-ghost { background: transparent; border-color: var(--border2); }
 .btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c); border-color: transparent; color: #fff; }
 .btn-danger-ghost { background: transparent; border-color: rgba(239,68,68,.5); color: #ff8a8a; }
