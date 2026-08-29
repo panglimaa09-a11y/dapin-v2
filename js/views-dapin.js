@@ -720,9 +720,10 @@
   Pages._bind_memberApply = function () {
     var form = document.getElementById('applyForm');
     if (!form) return;
-    var FIXED_RATE = 40;      /* internal: 40% flat per periode — TIDAK DITAMPILKAN ke anggota */
+    var FIXED_RATE_WEEKLY = 40;   /* mingguan: 40% flat per minggu */
+    var FIXED_RATE_MONTHLY = 20;  /* bulanan: 20% flat per bulan */
     var FIXED_METHOD = 'flat';
-    var ADMIN_FEE_PCT = 10;   /* potongan admin 10% */
+    var ADMIN_FEE_PCT = 10;       /* potongan admin 10% */
 
     form.onsubmit = function (e) {
       e.preventDefault();
@@ -731,6 +732,7 @@
       var period = d.period || 'bulanan';
       var isWeekly = period === 'mingguan';
       var periodLabel = isWeekly ? 'minggu' : 'bulan';
+      var FIXED_RATE = isWeekly ? FIXED_RATE_WEEKLY : FIXED_RATE_MONTHLY;
       var photoInput = form.querySelector('input[name="photo"]');
       var docsInput = form.querySelector('input[name="docs"]');
 
